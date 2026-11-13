@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAWbreach — Has your data been exposed?</title>
+<meta name="description" content="Check whether your email or password has been exposed in a known data breach.">
+<meta name="theme-color" content="#050405">
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=DM+Serif+Display:ital@1&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050405;
+    --surface: rgba(255,255,255,.028);
+    --surface-hi: rgba(255,255,255,.05);
+    --border: rgba(255,255,255,.08);
+    --border-hi: rgba(255,255,255,.15);
+    --text: #f5f5f6;
+    --text-2: #c9cbd0;
+    --muted: #8a8d94;
+    --faint: #50535a;
+    --red: #ed7163;
+    --red-2: #f4988c;
+    --red-dim: rgba(237,113,99,.13);
+    --red-line: rgba(240,128,115,.38);
+    --amber: #f5b142;
+    --amber-dim: rgba(245,177,66,.12);
+    --green: #3ddc84;
+    --green-dim: rgba(61,220,132,.1);
+    --radius: 16px;
+    --sans: Figtree, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --serif: "DM Serif Display", Georgia, serif;
+    --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-font-smoothing: antialiased; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); min-height: 100vh; overflow-x: hidden; }
+  ::selection { background: var(--red); color: #fff; }
+  :focus-visible { outline: 2px solid var(--red); outline-offset: 3px; border-radius: 8px; }
+
+  /* ================= HERO ================= */
+  .hero {
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(ellipse 60% 45% at 50% 0%, rgba(120,42,34,.45), transparent 70%),
+      radial-gradient(ellipse 90% 70% at 50% 40%, rgba(52,18,15,.55), transparent 75%),
+      var(--bg);
+  }
+  .map {
+    position: absolute; left: 50%; top: 96px; width: min(1480px, 98vw); transform: translateX(-50%);
+    pointer-events: none; user-select: none; opacity: 1;
+    -webkit-mask-image: radial-gradient(ellipse 72% 72% at 50% 45%, #000 58%, transparent 100%);
+    mask-image: radial-gradient(ellipse 72% 72% at 50% 45%, #000 58%, transparent 100%);
+  }
+  .container { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 56px); }
+
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 26px 0; }
+  .brand { display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--text); font-size: 30px; letter-spacing: -.6px; line-height: 1; }
+  .brand img { width: 58px; height: 58px; filter: drop-shadow(0 0 14px rgba(232,100,86,.35)); }
+  .brand b { font-weight: 700; }
+  .brand i { font-style: normal; font-weight: 500; color: #a3a5ab; }
+  .nav-links { display: flex; align-items: center; gap: 46px; }
+  .nav-links a { color: var(--text); text-decoration: none; font-size: 17px; font-weight: 500; opacity: .92; transition: opacity .15s, color .15s; }
+  .nav-links a:hover { color: var(--red-2); opacity: 1; }
+  .status { display: inline-flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 500; padding: 9px 18px; border: 1px solid rgba(255,255,255,.28); border-radius: 99px; background: rgba(0,0,0,.35); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px rgba(61,220,132,.8); animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+
+  .hero-in { text-align: center; padding: clamp(56px, 11vh, 120px) 0 0; }
+  h1 {
+    font-size: clamp(40px, 6.4vw, 76px); line-height: 1.05; letter-spacing: -.025em; font-weight: 600; color: #fff;
+    text-shadow: 0 2px 30px rgba(0,0,0,.7);
+  }
+  h1 em { font-family: var(--serif); font-style: italic; font-weight: 400; letter-spacing: -.01em; color: var(--red); text-shadow: 0 0 34px rgba(237,113,99,.45); padding-right: .04em; }
+  .lede { color: rgba(255,255,255,.88); font-size: clamp(16px, 1.6vw, 20px); margin: 18px auto 0; max-width: 940px; text-shadow: 0 1px 14px rgba(0,0,0,.8); }
+
+  /* search console */
+  .console {
+    position: relative; max-width: 940px; margin: clamp(40px, 7vh, 64px) auto 0; text-align: left;
+    padding: 26px 32px 30px; border-radius: 30px;
+    border: 1px solid var(--red-line);
+    background: linear-gradient(180deg, rgba(24,10,10,.82), rgba(10,7,7,.92));
+    box-shadow: 0 30px 90px -30px rgba(0,0,0,.9), 0 0 70px -20px rgba(232,100,86,.25), inset 0 1px 0 rgba(255,255,255,.04);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    transition: border-color .25s, box-shadow .25s;
+  }
+  .console::after {
+    content: ""; position: absolute; left: 50%; bottom: -1px; width: 62%; height: 2px; transform: translateX(-50%);
+    background: linear-gradient(90deg, transparent, var(--red) 30%, #fde0db 50%, var(--red) 70%, transparent);
+    box-shadow: 0 0 18px 2px rgba(237,113,99,.55); border-radius: 2px;
+  }
+  .console:focus-within { border-color: rgba(242,135,121,.7); box-shadow: 0 30px 90px -30px rgba(0,0,0,.9), 0 0 90px -16px rgba(232,100,86,.4); }
+
+  .tabs { display: flex; gap: 14px; margin-bottom: 22px; }
+  .tab {
+    display: inline-flex; align-items: center; gap: 12px; cursor: pointer;
+    font: 600 18px var(--sans); color: var(--text); padding: 12px 34px 12px 30px; border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.08); background: rgba(10,10,11,.9);
+    transition: background .2s, border-color .2s, box-shadow .2s;
+  }
+  .tab:hover { border-color: rgba(255,255,255,.18); }
+  .tab svg { color: var(--text); transition: color .2s; }
+  .tab.on {
+    background: linear-gradient(180deg, rgba(112,42,34,.55), rgba(64,24,20,.55));
+    border-color: rgba(242,135,121,.85); box-shadow: 0 0 22px -4px rgba(237,113,99,.55), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .tab.on svg { color: var(--red-2); }
+
+  form.search {
+    display: flex; align-items: stretch; border-radius: 16px; overflow: hidden;
+    background: #121213; border: 1px solid rgba(255,255,255,.1); transition: border-color .2s;
+  }
+  form.search:focus-within { border-color: rgba(255,255,255,.2); }
+  .field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 0 8px 0 22px; }
+  .field > svg { flex: none; color: #9a9ca2; }
+  form.search input {
+    flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text);
+    font: 500 21px var(--sans); letter-spacing: -.2px; padding: 20px 0;
+  }
+  form.search input::placeholder { color: #8f9198; font-weight: 400; }
+  .eye { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 8px; border-radius: 8px; display: none; }
+  .eye:hover { color: var(--text); background: var(--surface-hi); }
+  .pw .eye { display: grid; }
+  .go {
+    display: inline-flex; align-items: center; justify-content: center; gap: 12px; border: 0; cursor: pointer; flex: none;
+    font: 600 22px var(--sans); color: #fff; padding: 0 38px; min-width: 156px;
+    background: linear-gradient(180deg, #f2867a, #d9594b);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 0 30px -6px rgba(237,113,99,.8);
+    border-radius: 14px; margin: -1px -1px -1px 0;
+    transition: filter .15s, transform .12s;
+  }
+  .go:hover { filter: brightness(1.08); }
+  .go:active { transform: translateY(1px); }
+  .go:disabled { opacity: .6; cursor: progress; }
+
+  .strength { display: none; padding: 16px 4px 0; }
+  .pw .strength { display: block; }
+  .bars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .bars i { height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); transition: background .25s; }
+  .strength-row { display: flex; justify-content: space-between; margin-top: 8px; font: 13px var(--mono); color: var(--muted); }
+
+  .assure { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 14px 0; margin-top: 48px; }
+  .assure span { display: inline-flex; align-items: center; gap: 12px; padding: 0 46px; font-size: 17px; color: rgba(255,255,255,.9); }
+  .assure span + span { border-left: 1px solid rgba(255,255,255,.16); }
+  .assure svg { color: var(--red); filter: drop-shadow(0 0 6px rgba(237,113,99,.5)); }
+
+  /* glowing planet horizon */
+  .horizon { position: relative; height: 230px; margin-top: 40px; pointer-events: none; }
+  .planet {
+    position: absolute; left: 50%; top: 70px; width: max(3600px, 250vw); aspect-ratio: 1; transform: translateX(-50%); border-radius: 50%;
+    background: radial-gradient(closest-side, #050405 98%, transparent);
+    box-shadow: 0 -1px 0 1px rgba(246,150,138,.9), 0 -10px 40px rgba(232,100,86,.55), 0 -50px 140px rgba(226,92,78,.28), inset 0 30px 90px rgba(232,100,86,.12);
+  }
+  .horizon::before {
+    content: ""; position: absolute; left: 50%; top: 56px; width: min(620px, 80vw); height: 30px; transform: translateX(-50%);
+    background: radial-gradient(closest-side, rgba(255,235,228,.95), rgba(242,135,121,.65) 45%, transparent); filter: blur(6px); z-index: 1;
+  }
+  .horizon::after {
+    content: ""; position: absolute; left: 50%; top: -40px; width: min(900px, 100vw); height: 160px; transform: translateX(-50%);
+    background: radial-gradient(closest-side, rgba(232,100,86,.28), transparent); filter: blur(10px);
+  }
+
+  /* ================= CONTENT ================= */
+  .wrap { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 0 20px; }
+  #result { margin: 0 0 20px; scroll-margin-top: 20px; }
+  #result:empty { display: none; }
+  .fade { opacity: 0; transform: translateY(8px); animation: in .5s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes in { to { opacity: 1; transform: none; } }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  .summary { display: flex; align-items: center; gap: 26px; padding: 28px; position: relative; overflow: hidden; }
+  .summary::before { content: ""; position: absolute; inset: 0; pointer-events: none; }
+  .summary.bad::before  { background: radial-gradient(600px 220px at 0% 0%, var(--red-dim), transparent); }
+  .summary.warn::before { background: radial-gradient(600px 220px at 0% 0%, var(--amber-dim), transparent); }
+  .summary.good::before { background: radial-gradient(600px 220px at 0% 0%, var(--green-dim), transparent); }
+  .summary.bad { border-color: var(--red-line); }
+  .summary > * { position: relative; }
+  .ring { width: 104px; height: 104px; flex: none; position: relative; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke-width: 7; }
+  .ring .track { stroke: rgba(255,255,255,.06); }
+  .ring .val { stroke-linecap: round; transition: stroke-dashoffset 1.1s cubic-bezier(.2,.7,.2,1); filter: drop-shadow(0 0 6px currentColor); }
+  .ring .num { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+  .ring .num b { font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+  .ring .num small { font: 10px var(--mono); color: var(--muted); letter-spacing: 1px; margin-top: 4px; }
+  .badge-icon { width: 64px; height: 64px; flex: none; border-radius: 18px; display: grid; place-items: center; }
+  .good .badge-icon { background: var(--green-dim); color: var(--green); box-shadow: 0 0 0 1px rgba(61,220,132,.25) inset; }
+  .err .badge-icon { background: var(--surface-hi); color: var(--muted); box-shadow: 0 0 0 1px var(--border) inset; }
+  .sum-text { min-width: 0; }
+  .level { display: inline-flex; align-items: center; gap: 6px; font: 500 11px var(--mono); letter-spacing: 1px; text-transform: uppercase; padding: 3px 9px; border-radius: 99px; margin-bottom: 10px; }
+  .level.bad { color: var(--red-2); background: var(--red-dim); }
+  .level.warn { color: var(--amber); background: var(--amber-dim); }
+  .level.good { color: var(--green); background: var(--green-dim); }
+  .sum-text h2 { font-size: 26px; font-weight: 700; letter-spacing: -.6px; line-height: 1.2; }
+  .sum-text p { color: var(--muted); margin-top: 6px; font-size: 15px; overflow-wrap: anywhere; }
+  .sum-text p code { font: 14px var(--mono); color: var(--text-2); }
+
+  .report-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 14px 14px 20px; margin-top: 12px; }
+  .report-bar p { color: var(--muted); font-size: 14px; }
+  .report-bar p b { display: block; color: var(--text); font-weight: 600; font-size: 15px; }
+  .btn-report {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex: none; cursor: pointer;
+    border: 1px solid var(--red-line); background: var(--red-dim); color: #fff;
+    font: 600 14px var(--sans); padding: 11px 16px; border-radius: 11px; transition: background .15s, border-color .15s, box-shadow .15s;
+  }
+  .btn-report svg { color: var(--red-2); }
+  .btn-report:hover { background: rgba(237,113,99,.22); border-color: rgba(242,135,121,.75); box-shadow: 0 0 20px -6px rgba(237,113,99,.6); }
+  .btn-report:disabled { opacity: .6; cursor: progress; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 12px; }
+  .stat { padding: 18px 20px; }
+  .stat + .stat { border-left: 1px solid var(--border); }
+  .stat span { display: block; font: 11px var(--mono); color: var(--muted); letter-spacing: .8px; text-transform: uppercase; }
+  .stat b { display: block; font-size: 26px; font-weight: 700; letter-spacing: -.8px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+
+  .sec-h { display: flex; align-items: baseline; justify-content: space-between; margin: 44px 0 14px; }
+  .sec-h h3 { font-size: 12px; font-weight: 500; font-family: var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-2); }
+  .sec-h span { font: 12px var(--mono); color: var(--faint); }
+
+  .exposed { padding: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; padding: 6px 10px 6px 12px; border-radius: 9px; background: var(--surface-hi); border: 1px solid var(--border); color: var(--text-2); }
+  .tag em { font: normal 11px var(--mono); color: var(--muted); background: rgba(255,255,255,.05); padding: 1px 6px; border-radius: 5px; }
+  .tag.hot { color: #f7bdb5; border-color: var(--red-line); background: var(--red-dim); }
+  .tag.hot em { color: var(--red-2); background: rgba(237,113,99,.14); }
+
+  .timeline { position: relative; }
+  .timeline::before { content: ""; position: absolute; left: 21px; top: 24px; bottom: 24px; width: 1px; background: linear-gradient(var(--red-line), transparent); }
+  .item { display: flex; gap: 18px; padding: 0 0 12px; }
+  .node { flex: none; width: 43px; display: flex; justify-content: center; padding-top: 22px; }
+  .node i { width: 9px; height: 9px; border-radius: 50%; background: var(--bg); border: 2px solid var(--red); box-shadow: 0 0 0 4px var(--bg), 0 0 10px 3px rgba(237,113,99,.45); }
+  .breach { flex: 1; min-width: 0; padding: 18px 20px; transition: border-color .2s, background .2s; }
+  .breach:hover { border-color: var(--border-hi); background: rgba(255,255,255,.035); }
+  .b-top { display: flex; align-items: center; gap: 14px; }
+  .logo { width: 40px; height: 40px; flex: none; border-radius: 11px; display: grid; place-items: center; font-weight: 700; font-size: 16px; color: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset; }
+  .b-meta { flex: 1; min-width: 0; }
+  .b-meta h4 { font-size: 17px; font-weight: 600; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .b-meta small { display: block; color: var(--muted); font: 12px var(--mono); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .b-year { font: 500 13px var(--mono); color: var(--text-2); }
+  .verified { display: inline-flex; align-items: center; gap: 4px; font: 500 11px var(--mono); color: var(--green); }
+  .b-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .b-tags span { font-size: 13px; padding: 3px 9px; border-radius: 7px; background: rgba(255,255,255,.04); color: var(--muted); }
+  .b-tags span.hot { color: #f4a59b; background: var(--red-dim); }
+  details { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+  summary { cursor: pointer; list-style: none; font-size: 14px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; user-select: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary:hover { color: var(--text); }
+  summary svg { transition: transform .2s; }
+  details[open] summary svg { transform: rotate(90deg); }
+  details p { color: var(--text-2); font-size: 15px; margin-top: 10px; line-height: 1.65; }
+
+  .actions { counter-reset: step; }
+  .action { display: flex; gap: 16px; padding: 18px 20px; }
+  .action + .action { border-top: 1px solid var(--border); }
+  .action::before { counter-increment: step; content: counter(step, decimal-leading-zero); font: 500 12px var(--mono); color: var(--red); padding-top: 3px; }
+  .action b { display: block; font-weight: 600; letter-spacing: -.2px; }
+  .action span { color: var(--muted); font-size: 15px; }
+  .action.urgent b::after { content: "Urgent"; margin-left: 8px; font: 500 10px var(--mono); letter-spacing: .8px; text-transform: uppercase; color: var(--red-2); background: var(--red-dim); padding: 2px 7px; border-radius: 99px; vertical-align: 2px; }
+  .source { margin-top: 16px; font: 12px var(--mono); color: var(--faint); text-align: center; }
+
+  .loading { padding: 40px 28px; display: flex; align-items: center; gap: 16px; color: var(--text-2); }
+  .spin { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,.1); border-top-color: var(--red); animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading small { display: block; font: 12px var(--mono); color: var(--muted); }
+
+  .how { margin: 70px 0 0; scroll-margin-top: 20px; }
+  .how-h { text-align: center; margin-bottom: 36px; }
+  .how-h h2 { font-size: clamp(30px, 4.6vw, 44px); font-weight: 700; letter-spacing: -1.2px; line-height: 1.1; }
+  .how-h h2 em { font-family: var(--serif); font-weight: 400; color: var(--red); }
+  .how-h p { color: var(--muted); margin-top: 10px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .feat { padding: 24px; transition: border-color .2s; }
+  .feat:hover { border-color: var(--red-line); }
+  .feat .fi { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; background: var(--red-dim); border: 1px solid var(--red-line); color: var(--red-2); margin-bottom: 18px; }
+  .feat h4 { font-size: 17px; font-weight: 600; letter-spacing: -.2px; }
+  .feat p { color: var(--muted); font-size: 15px; margin-top: 6px; }
+  .feat code { font: 12px var(--mono); color: var(--text-2); background: var(--surface-hi); padding: 1px 5px; border-radius: 4px; }
+
+  footer { margin-top: 90px; border-top: 1px solid var(--border); padding: 28px 0 40px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; color: var(--faint); font-size: 14px; }
+  footer .f-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); }
+  footer img { width: 26px; height: 26px; }
+  footer a { color: var(--muted); text-decoration: none; }
+  footer a:hover { color: var(--text); }
+
+  /* ================= RESPONSIVE ================= */
+  @media (max-width: 900px) {
+    .nav-links a { display: none; }
+    .assure span { padding: 0 22px; font-size: 15px; }
+  }
+  @media (max-width: 640px) {
+    nav { padding: 18px 0; }
+    .brand { font-size: 22px; gap: 10px; }
+    .brand img { width: 42px; height: 42px; }
+    .status { font-size: 13px; padding: 7px 12px; }
+    .map { top: 120px; width: 180vw; }
+    .console { padding: 16px; border-radius: 22px; }
+    .tabs { gap: 8px; margin-bottom: 14px; }
+    .tab { flex: 1; justify-content: center; padding: 11px 12px; font-size: 16px; }
+    .field { padding-left: 14px; gap: 10px; }
+    form.search input { font-size: 17px; padding: 16px 0; }
+    .go { min-width: 0; padding: 0 18px; font-size: 18px; }
+    .go svg { display: none; }
+    .assure { flex-direction: column; gap: 12px; margin-top: 34px; }
+    .assure span { padding: 0; font-size: 15px; }
+    .assure span + span { border-left: 0; }
+    .horizon { height: 150px; margin-top: 20px; }
+    .planet { top: 50px; }
+    .horizon::before { top: 36px; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .stat:nth-child(3) { border-left: 0; }
+    .stat:nth-child(n+3) { border-top: 1px solid var(--border); }
+    .summary { flex-direction: column; align-items: flex-start; gap: 18px; padding: 22px; }
+    .report-bar { flex-direction: column; align-items: stretch; padding: 16px; }
+    .grid3 { grid-template-columns: 1fr; }
+    .timeline::before, .node { display: none; }
+    .b-year { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .fade { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <img class="map" src="/static/worldmap.svg" alt="" aria-hidden="true">
+  <div class="container">
+    <nav>
+      <a class="brand" href="/" aria-label="RAWbreach home">
+        <img src="/static/logo.png" alt="" width="58" height="58">
+        <span class="word"><b>RAW</b> <i>breach</i></span>
+      </a>
+      <div class="nav-links">
+        <a href="#how">How it works</a>
+        <a href="#how">Privacy</a>
+        <span class="status"><span class="dot"></span>Database Online</span>
+      </div>
+    </nav>
+
+    <div class="hero-in">
+      <h1>Has your data been <em>exposed</em>?</h1>
+      <p class="lede">Search billions of leaked records. Find out where your information ended up — and what to do next.</p>
+
+      <div class="console" id="console">
+        <div class="tabs" role="tablist" aria-label="Check type">
+          <button class="tab on" data-mode="email" type="button" role="tab" aria-selected="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Email
+          </button>
+          <button class="tab" data-mode="password" type="button" role="tab" aria-selected="false">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><path d="M12 15v2"/></svg>Password
+          </button>
+        </div>
+        <form class="search" id="form" autocomplete="off">
+          <div class="field">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="q" type="email" placeholder="Enter your email address..." required aria-label="Email address" spellcheck="false">
+            <button class="eye" id="eye" type="button" aria-label="Show password">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <button class="go" id="go" type="submit">Scan
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+          </button>
+        </form>
+        <div class="strength" aria-live="polite">
+          <div class="bars"><i></i><i></i><i></i><i></i></div>
+          <div class="strength-row"><span id="sLabel">Strength</span><span id="sTime">—</span></div>
+        </div>
+      </div>
+
+      <div class="assure">
+        <span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>No searches stored</span>
+        <span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><path d="M12 15v2"/></svg>Passwords never leave your device</span>
+        <span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>No account required</span>
+      </div>
+    </div>
+  </div>
+  <div class="horizon" aria-hidden="true"><div class="planet"></div></div>
+</header>
+
+<main class="wrap">
+  <div id="result" aria-live="polite"></div>
+
+  <section class="how" id="how">
+    <div class="how-h">
+      <h2>Private by design, <em>not by promise.</em></h2>
+      <p>Here is exactly what happens when you run a scan.</p>
+    </div>
+    <div class="grid3">
+      <div class="panel feat">
+        <div class="fi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg></div>
+        <h4>Live breach lookup</h4>
+        <p>Your email is checked server-side against a continuously updated index of public breach disclosures.</p>
+      </div>
+      <div class="panel feat">
+        <div class="fi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+        <h4>k-anonymity hashing</h4>
+        <p>Passwords are SHA-1 hashed in your browser. Only the first 5 characters — like <code>5BAA6</code> — are ever sent.</p>
+      </div>
+      <div class="panel feat">
+        <div class="fi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <h4>Zero retention</h4>
+        <p>Nothing you search is logged, stored or shared. Close the tab and it's gone.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span class="f-brand"><img src="/static/logo.png" alt="">© RAWbreach</span>
+    <span>Data: <a href="https://xposedornot.com" target="_blank" rel="noopener">XposedOrNot</a> · <a href="https://haveibeenpwned.com/API/v3#PwnedPasswords" target="_blank" rel="noopener">Pwned Passwords</a></span>
+  </footer>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const form = $("#form"), q = $("#q"), go = $("#go"), out = $("#result"), consoleEl = $("#console");
+const tabs = [...document.querySelectorAll(".tab")];
+let mode = "email";
+
+const ICON = {
+  check: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>',
+  err: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
+  chev: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
+  tick: '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  download: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>'
+};
+
+// ---------- DOM helper (textContent only -> XSS-safe for API data)
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined && text !== null) e.textContent = text;
+  return e;
+}
+const fmt = n => Number(n || 0).toLocaleString();
+const compact = n => Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n || 0);
+const SENSITIVE = /password|hash|phone|physical address|birth|credit|bank|security q|social security|passport|ip address|geo/i;
+
+// ---------- mode switch
+tabs.forEach(b => b.addEventListener("click", () => {
+  tabs.forEach(t => { t.classList.toggle("on", t === b); t.setAttribute("aria-selected", t === b); });
+  mode = b.dataset.mode;
+  const pw = mode === "password";
+  consoleEl.classList.toggle("pw", pw);
+  q.value = ""; out.replaceChildren(); updateStrength("");
+  q.type = pw ? "password" : "email";
+  q.placeholder = pw ? "Enter a password to test..." : "Enter your email address...";
+  q.setAttribute("aria-label", pw ? "Password" : "Email address");
+  q.focus();
+}));
+
+$("#eye").addEventListener("click", () => { q.type = q.type === "password" ? "text" : "password"; q.focus(); });
+
+// ---------- live password strength (local only)
+function estimate(pw) {
+  let pool = 0;
+  if (/[a-z]/.test(pw)) pool += 26;
+  if (/[A-Z]/.test(pw)) pool += 26;
+  if (/\d/.test(pw)) pool += 10;
+  if (/[^a-zA-Z0-9]/.test(pw)) pool += 33;
+  let bits = pw.length * Math.log2(pool || 1);
+  if (/(.)\1{2,}/.test(pw) || /^(?:123|abc|qwe|pass|admin|letmein)/i.test(pw)) bits *= .6;
+  return bits;
+}
+function crackTime(bits) {
+  const s = Math.pow(2, bits) / 1e10 / 2; // 10B guesses/sec, average case
+  const units = [["centuries", 3.15e9], ["years", 3.15e7], ["days", 86400], ["hours", 3600], ["minutes", 60], ["seconds", 1]];
+  if (s < 1) return "instantly";
+  for (const [u, v] of units) if (s >= v) { const n = Math.floor(s / v); return n > 1e6 ? "forever" : `${compact(n)} ${u}`; }
+}
+function updateStrength(pw) {
+  const bars = document.querySelectorAll(".bars i");
+  if (!pw) { bars.forEach(b => b.style.background = ""); $("#sLabel").textContent = "Strength"; $("#sTime").textContent = "—"; return; }
+  const bits = estimate(pw);
+  const lvl = bits < 28 ? 1 : bits < 45 ? 2 : bits < 65 ? 3 : 4;
+  const col = ["", "var(--red)", "var(--amber)", "#c6e05a", "var(--green)"][lvl];
+  bars.forEach((b, i) => b.style.background = i < lvl ? col : "");
+  $("#sLabel").textContent = ["", "Weak", "Fair", "Good", "Strong"][lvl];
+  const t = crackTime(bits);
+  $("#sTime").textContent = t === "instantly" ? "Cracked instantly" : "Cracked in ~" + t;
+}
+q.addEventListener("input", () => { if (mode === "password") updateStrength(q.value); });
+
+// ---------- shared UI pieces
+function summary(kind, { ring, icon, level, title, sub }) {
+  const s = el("div", `panel summary ${kind} fade`);
+  if (ring !== undefined) {
+    const color = kind === "bad" ? "var(--red)" : kind === "warn" ? "var(--amber)" : "var(--green)";
+    const C = 2 * Math.PI * 46;
+    const r = el("div", "ring");
+    r.innerHTML = `<svg width="104" height="104" viewBox="0 0 104 104"><circle class="track" cx="52" cy="52" r="46"/><circle class="val" cx="52" cy="52" r="46" stroke="${color}" style="color:${color}" stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg>`;
+    const num = el("div", "num"); num.append(el("b", null, ring), el("small", null, "RISK"));
+    r.append(num); s.append(r);
+    requestAnimationFrame(() => requestAnimationFrame(() => r.querySelector(".val").style.strokeDashoffset = C * (1 - ring / 100)));
+  } else {
+    const b = el("div", "badge-icon"); b.innerHTML = icon; s.append(b);
+  }
+  const t = el("div", "sum-text");
+  if (level) t.append(el("span", `level ${kind}`, level));
+  t.append(el("h2", null, title));
+  if (sub) { const p = el("p"); sub instanceof Node ? p.append(sub) : (p.textContent = sub); t.append(p); }
+  s.append(t);
+  return s;
+}
+function sectionHead(title, note, delay) {
+  const h = el("div", "sec-h fade"); h.style.animationDelay = delay + "ms";
+  h.append(el("h3", null, title), el("span", null, note || ""));
+  return h;
+}
+function logoColor(name) {
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return `linear-gradient(145deg, hsl(${h} 60% 52%), hsl(${(h + 30) % 360} 65% 36%))`;
+}
+function actionList(items, delay) {
+  const box = el("div", "panel actions fade"); box.style.animationDelay = delay + "ms";
+  items.forEach(([t, s, urgent]) => {
+    const a = el("div", "action" + (urgent ? " urgent" : ""));
+    const d = el("div"); d.append(el("b", null, t), el("span", null, s));
+    a.append(d); box.append(a);
+  });
+  return box;
+}
+
+// ---------- personalised checklist (used on the page and in the PDF)
+function emailActions(d) {
+  if (!d.found) return [
+    ["Use a password manager", "Unique passwords per site stop one breach from unlocking everything."],
+    ["Turn on two-factor authentication", "A stolen password alone won't get attackers into your accounts."],
+    ["Check again periodically", "New breaches are disclosed every week."]
+  ];
+  const has = re => d.breaches.some(b => b.data.some(x => re.test(x)));
+  return [
+    has(/password/i) && ["Change affected passwords now", "A password tied to this email was leaked. Change it on every site where you reused it.", true],
+    has(/credit|bank|payment/i) && ["Check your bank and card statements", "Financial data was exposed. Report unfamiliar charges and consider replacing affected cards.", true],
+    has(/phone/i) && ["Protect your phone number", "Ask your mobile carrier for a SIM-swap PIN and never share codes sent by text."],
+    has(/birth|physical address|social security|passport|government/i) && ["Consider a credit freeze", "Identity details leaked. A credit freeze stops new accounts being opened in your name."],
+    ["Enable two-factor authentication", "Even with your password, attackers can't sign in without the second factor."],
+    ["Switch to a password manager", "Generate a unique password for every account so one breach can't cascade."],
+    ["Be alert to phishing", "Leaked emails are prime targets for convincing scam messages referencing real services."]
+  ].filter(Boolean);
+}
+
+// ---------- PDF report (generated entirely in the browser, never sent to the server)
+function reportBar(d) {
+  const bar = el("div", "panel report-bar fade"); bar.style.animationDelay = "60ms";
+  const p = el("p"); p.append(el("b", null, "Download your report"), "A PDF of these results with a personalised action checklist.");
+  const btn = el("button", "btn-report"); btn.type = "button";
+  btn.innerHTML = ICON.download;
+  const label = document.createTextNode("Download PDF"); btn.append(label);
+  btn.addEventListener("click", async () => {
+    btn.disabled = true; label.textContent = "Preparing…";
+    try { const [, assets] = await Promise.all([loadJsPDF(), loadReportAssets()]); buildPdf(d, assets); }
+    catch (e) { alert(e.message || "Couldn't create the PDF."); }
+    finally { btn.disabled = false; label.textContent = "Download PDF"; }
+  });
+  bar.append(p, btn);
+  return bar;
+}
+
+let jsPdfLoading;
+function loadJsPDF() {
+  if (window.jspdf) return Promise.resolve();
+  return jsPdfLoading ||= new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    s.onload = res;
+    s.onerror = () => { jsPdfLoading = null; rej(new Error("Couldn't load the PDF generator. Check your connection.")); };
+    document.head.append(s);
+  });
+}
+
+// logo images for the PDF header and watermark (the report still works if they fail to load)
+let assetsLoading;
+function loadReportAssets() {
+  const toDataUrl = url => fetch(url).then(r => r.ok ? r.blob() : null).then(b => b && new Promise(res => {
+    const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(null); fr.readAsDataURL(b);
+  })).catch(() => null);
+  return assetsLoading ||= Promise.all([toDataUrl("/static/logo.png"), toDataUrl("/static/logo-watermark.png")])
+    .then(([logo, watermark]) => ({ logo, watermark }));
+}
+
+// built-in PDF fonts only cover Latin-1, so normalise everything else
+const pdfText = s => String(s ?? "")
+  .replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/…/g, "...")
+  .replace(/[^\x0A\x20-\x7E\xA0-\xFF]/g, "");
+
+function buildPdf(d, assets = {}) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const W = 210, H = 297, M = 18, CW = W - M * 2;
+  const C = { ink: [18, 20, 24], muted: [105, 111, 121], faint: [155, 160, 168], line: [228, 230, 234], soft: [246, 247, 249],
+              red: [222, 98, 84], redSoft: [252, 237, 234], amber: [200, 135, 25], green: [28, 150, 100] };
+  let y = 0;
+  const font = (size, style = "normal", color = C.ink) => { doc.setFont("helvetica", style); doc.setFontSize(size); doc.setTextColor(...color); };
+
+  // watermark: faint logo in the middle of every page + diagonal brand text, drawn first so it sits behind the content
+  const watermark = () => {
+    doc.setGState(new doc.GState({ opacity: .06 }));
+    if (assets.watermark) doc.addImage(assets.watermark, "PNG", W / 2 - 55, H / 2 - 55, 110, 110, "wm", "FAST");
+    doc.setGState(new doc.GState({ opacity: .05 }));
+    font(64, "bold", C.red);
+    const label = "RAWbreach", a = 35 * Math.PI / 180, tw = doc.getTextWidth(label);
+    doc.text(label, W / 2 - Math.cos(a) * tw / 2, H / 2 + Math.sin(a) * tw / 2 + 8, { angle: 35 });
+    doc.setGState(new doc.GState({ opacity: 1 }));
+  };
+  const need = h => { if (y + h > H - 20) { doc.addPage(); watermark(); y = 22; } };
+  const para = (text, size, color, x = M, width = CW, style = "normal") => {
+    font(size, style, color);
+    const lh = size * 0.45;
+    doc.splitTextToSize(pdfText(text), width).forEach(line => { need(lh); doc.text(line, x, y); y += lh; });
+  };
+  const section = (title, keepWith = 14) => {
+    need(16 + keepWith); y += 6;   // never leave a heading orphaned at the bottom of a page
+    font(8, "bold", C.muted); doc.text(title.toUpperCase(), M, y);
+    doc.setDrawColor(...C.line); doc.setLineWidth(.3); doc.line(M, y + 2.5, W - M, y + 2.5);
+    y += 10;
+  };
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
+  watermark();
+
+  // header band
+  doc.setFillColor(8, 6, 7); doc.rect(0, 0, W, 34, "F");
+  doc.setFillColor(...C.red); doc.rect(0, 34, W, .8, "F");
+  let bx = M;
+  if (assets.logo) { doc.addImage(assets.logo, "PNG", M - 2, 6, 22, 22, "logo", "FAST"); bx = M + 23; }
+  else { doc.setFillColor(...C.red); doc.roundedRect(M, 11, 11, 11, 2.5, 2.5, "F"); font(13, "bold", [255, 255, 255]); doc.text("!", M + 5.5, 18.8, { align: "center" }); bx = M + 15; }
+  font(16, "bold", [255, 255, 255]); doc.text("RAW", bx, 16.6);
+  const rw = doc.getTextWidth("RAW");
+  font(16, "normal", [163, 165, 171]); doc.text("breach", bx + rw + 1.2, 16.6);
+  font(8.5, "normal", [150, 155, 163]); doc.text("Breach Exposure Report", bx, 22);
+  doc.text(`${dateStr} · ${timeStr}`, W - M, 16.4, { align: "right" });
+  doc.text("Confidential - for the account owner", W - M, 21.4, { align: "right" });
+  y = 48;
+
+  // subject
+  font(7.5, "bold", C.muted); doc.text("REPORT FOR", M, y); y += 6.5;
+  font(16, "bold", C.ink); doc.text(pdfText(d.email), M, y); y += 6;
+  font(9, "normal", C.muted); doc.text(pdfText("Databases checked: " + d.source), M, y); y += 9;
+
+  // summary box
+  const score = d.found ? riskScore(d) : 0;
+  const tone = !d.found ? C.green : score >= 50 ? C.red : C.amber;
+  const level = !d.found ? "All clear" : score >= 75 ? "Critical risk" : score >= 50 ? "High risk" : "Moderate risk";
+  const types = {};
+  d.breaches.forEach(b => b.data.forEach(x => types[x] = (types[x] || 0) + 1));
+  const years = d.breaches.map(b => String(b.date).slice(0, 4)).filter(v => /^\d{4}$/.test(v)).sort();
+
+  doc.setFillColor(...C.soft); doc.setDrawColor(...C.line); doc.setLineWidth(.3);
+  doc.roundedRect(M, y, CW, 32, 3, 3, "FD");
+  font(28, "bold", tone); doc.text(String(score), M + 8, y + 17);
+  font(7, "bold", C.muted); doc.text("RISK SCORE / 100", M + 8, y + 24);
+  const tx = M + 48;
+  font(8, "bold", tone); doc.text(level.toUpperCase(), tx, y + 9);
+  font(12.5, "bold", C.ink);
+  doc.text(d.found ? `Found in ${d.count} data breach${d.count > 1 ? "es" : ""}` : "No breaches found in the databases checked", tx, y + 15.5);
+  font(9, "normal", C.muted);
+  doc.text(d.found
+    ? `${compact(d.total_records)} records leaked  ·  ${Object.keys(types).length} data types  ·  since ${years[0] || "unknown"}`
+    : "Follow the checklist below to stay protected.", tx, y + 22);
+  y += 36;
+
+  // exposed data chips
+  if (d.found && Object.keys(types).length) {
+    section("Exposed data");
+    const sorted = Object.entries(types).sort((a, b) => (SENSITIVE.test(b[0]) - SENSITIVE.test(a[0])) || b[1] - a[1]);
+    let x = M; need(8);
+    sorted.forEach(([t, n]) => {
+      const hot = SENSITIVE.test(t), label = pdfText(`${t}  x${n}`);
+      font(8.5, hot ? "bold" : "normal", hot ? C.red : C.ink);
+      const w = doc.getTextWidth(label) + 6;
+      if (x + w > W - M) { x = M; y += 8.5; need(8); }
+      doc.setFillColor(...(hot ? C.redSoft : C.soft)); doc.roundedRect(x, y - 4.6, w, 6.6, 1.6, 1.6, "F");
+      doc.text(label, x + 3, y);
+      x += w + 2.5;
+    });
+    y += 8;
+    para("Items in red are sensitive data types and carry higher risk.", 7.5, C.faint);
+  }
+
+  // checklist
+  section("Action checklist");
+  emailActions(d).forEach(([t, s, urgent]) => {
+    need(15);
+    doc.setDrawColor(...C.muted); doc.setLineWidth(.35); doc.roundedRect(M, y - 3.6, 4.2, 4.2, .8, .8, "S");
+    font(10.5, "bold", C.ink); doc.text(pdfText(t), M + 8, y);
+    if (urgent) { const w = doc.getTextWidth(pdfText(t)); font(6.8, "bold", C.red); doc.text("URGENT", M + 8 + w + 3, y - .3); }
+    y += 5;
+    para(s, 9, C.muted, M + 8, CW - 8);
+    y += 3.5;
+  });
+
+  // breach details
+  if (d.found) {
+    section(`Breach details (${d.count})`, 30);
+    d.breaches.forEach((b, i) => {
+      need(24);
+      font(11.5, "bold", C.ink); doc.text(pdfText(b.name || "Unknown"), M, y);
+      font(9, "bold", C.muted); doc.text(pdfText(String(b.date || "")), W - M, y, { align: "right" });
+      y += 5;
+      const meta = [b.domain, b.records ? fmt(b.records) + " accounts" : "", b.verified ? "Verified breach" : ""].filter(Boolean).join("  ·  ");
+      if (meta) para(meta, 8.5, C.muted);
+      if (b.data.length) { y += 1; para("Data exposed: " + b.data.join(", "), 8.5, C.ink); }
+      if (b.description) {
+        y += 1;
+        para(b.description.length > 650 ? b.description.slice(0, 647).trimEnd() + "..." : b.description, 8.5, C.muted);
+      }
+      y += 3;
+      if (i < d.breaches.length - 1) { need(6); doc.setDrawColor(...C.line); doc.setLineWidth(.3); doc.line(M, y, W - M, y); y += 7; }
+    });
+  }
+
+  section("About this report");
+  para(`Results reflect the breach databases checked (${d.source}) at the time this report was generated. No single database contains every breach, so a clean result does not guarantee an address has never been exposed. This report was created in your browser - RAWbreach does not store your searches.`, 8.5, C.muted);
+
+  // footer on every page
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(...C.line); doc.setLineWidth(.3); doc.line(M, H - 14, W - M, H - 14);
+    font(7.5, "normal", C.faint);
+    doc.text("RAWbreach · Breach Exposure Report", M, H - 9);
+    doc.text(`Page ${i} of ${pages}`, W - M, H - 9, { align: "right" });
+  }
+  doc.save(`RAWbreach-report-${now.toISOString().slice(0, 10)}.pdf`);
+}
+
+// ---------- email results
+function riskScore(d) {
+  const sensitive = new Set(d.breaches.flatMap(b => b.data.filter(x => SENSITIVE.test(x))));
+  const yr = new Date().getFullYear();
+  const recent = d.breaches.filter(b => +String(b.date).slice(0, 4) >= yr - 2).length;
+  return Math.min(98, Math.round(18 + d.count * 7 + sensitive.size * 6 + recent * 8));
+}
+
+function renderEmail(d) {
+  out.replaceChildren();
+  const who = el("code", null, d.email);
+
+  if (!d.found) {
+    out.append(summary("good", { icon: ICON.check, level: "All clear", title: "No breaches found in the databases we checked", sub: who }));
+    out.append(reportBar(d));
+    out.append(sectionHead("Stay protected", "", 120));
+    out.append(actionList(emailActions(d), 160));
+    out.append(el("p", "source", "Source · " + d.source));
+    return;
+  }
+
+  const score = riskScore(d);
+  const kind = score >= 50 ? "bad" : "warn";
+  const level = score >= 75 ? "Critical risk" : score >= 50 ? "High risk" : "Moderate risk";
+  out.append(summary(kind, {
+    ring: score, level,
+    title: `Found in ${d.count} data breach${d.count > 1 ? "es" : ""}`,
+    sub: who
+  }));
+  out.append(reportBar(d));
+
+  // stats
+  const years = d.breaches.map(b => String(b.date).slice(0, 4)).filter(y => /^\d{4}$/.test(y)).sort();
+  const allTypes = {};
+  d.breaches.forEach(b => b.data.forEach(x => allTypes[x] = (allTypes[x] || 0) + 1));
+  const stats = el("div", "panel stats fade"); stats.style.animationDelay = "80ms";
+  [["Breaches", d.count], ["Records leaked", compact(d.total_records)], ["Data types", Object.keys(allTypes).length], ["First seen", years[0] || "—"]]
+    .forEach(([l, v]) => { const s = el("div", "stat"); s.append(el("span", null, l), el("b", null, v)); stats.append(s); });
+  out.append(stats);
+
+  // exposed data
+  const types = Object.entries(allTypes).sort((a, b) => (SENSITIVE.test(b[0]) - SENSITIVE.test(a[0])) || b[1] - a[1]);
+  if (types.length) {
+    const hot = types.filter(([t]) => SENSITIVE.test(t)).length;
+    out.append(sectionHead("Exposed data", hot ? `${hot} sensitive` : "", 140));
+    const box = el("div", "panel exposed fade"); box.style.animationDelay = "160ms";
+    types.forEach(([t, n]) => { const g = el("span", "tag" + (SENSITIVE.test(t) ? " hot" : ""), t); g.append(el("em", null, "×" + n)); box.append(g); });
+    out.append(box);
+  }
+
+  // timeline
+  out.append(sectionHead("Breach timeline", years.length ? `${years[0]} → ${years.at(-1)}` : "", 200));
+  const tl = el("div", "timeline");
+  d.breaches.forEach((b, i) => {
+    const item = el("div", "item fade"); item.style.animationDelay = 220 + Math.min(i, 10) * 50 + "ms";
+    const node = el("div", "node"); node.append(el("i"));
+    const card = el("div", "panel breach");
+    const top = el("div", "b-top");
+    const name = b.name || "Unknown";
+    const logo = el("div", "logo", name[0].toUpperCase()); logo.style.background = logoColor(name);
+    const meta = el("div", "b-meta");
+    meta.append(el("h4", null, name));
+    meta.append(el("small", null, [b.domain, b.records ? fmt(b.records) + " accounts" : ""].filter(Boolean).join(" · ") || "Undisclosed source"));
+    top.append(logo, meta);
+    if (b.verified) { const v = el("span", "verified"); v.innerHTML = ICON.tick; v.append(" Verified"); top.append(v); }
+    top.append(el("span", "b-year", String(b.date).slice(0, 4)));
+    card.append(top);
+    if (b.data.length) {
+      const tags = el("div", "b-tags");
+      b.data.forEach(x => tags.append(el("span", SENSITIVE.test(x) ? "hot" : "", x)));
+      card.append(tags);
+    }
+    if (b.description) {
+      const det = el("details"), sm = el("summary");
+      sm.innerHTML = ICON.chev; sm.append("What happened");
+      det.append(sm, el("p", null, b.description));
+      card.append(det);
+    }
+    item.append(node, card); tl.append(item);
+  });
+  out.append(tl);
+
+  // actions
+  out.append(sectionHead("Recommended actions", "", 300));
+  out.append(actionList(emailActions(d), 340));
+  out.append(el("p", "source", "Source · " + d.source));
+}
+
+async function checkEmail(email) {
+  const r = await fetch("/api/email?email=" + encodeURIComponent(email));
+  let d; try { d = await r.json(); } catch { throw new Error("Unexpected response from the server."); }
+  if (!r.ok) throw new Error(d.error || "Something went wrong.");
+  renderEmail(d);
+}
+
+// ---------- password check (k-anonymity: hash locally, send only first 5 hex chars)
+async function checkPassword(pw) {
+  const buf = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(pw));
+  const hash = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+  const prefix = hash.slice(0, 5), suffix = hash.slice(5);
+  const r = await fetch("https://api.pwnedpasswords.com/range/" + prefix, { headers: { "Add-Padding": "true" } });
+  if (!r.ok) throw new Error("Couldn't reach the password database.");
+  let count = 0;
+  for (const line of (await r.text()).split("\n")) {
+    const [s, c] = line.trim().split(":");
+    if (s === suffix) { count = parseInt(c, 10); break; }
+  }
+  out.replaceChildren();
+  const hashNote = el("span"); hashNote.append("Only ", el("code", null, prefix), " left your device.");
+  if (count) {
+    const score = Math.min(99, 60 + Math.round(Math.log10(count + 1) * 7));
+    out.append(summary("bad", { ring: score, level: "Compromised", title: `Seen ${fmt(count)} time${count > 1 ? "s" : ""} in data leaks`, sub: hashNote }));
+    out.append(sectionHead("What this means", "", 120));
+    out.append(actionList([
+      ["Stop using this password", "It's in public wordlists that attackers try first. Treat it as public knowledge.", true],
+      ["Replace it everywhere", "Every account using it is vulnerable to credential stuffing."],
+      ["Generate unique passwords", "A password manager makes a long random password for each site."]
+    ], 160));
+  } else {
+    out.append(summary("good", { icon: ICON.check, level: "Not found", title: "Not found in any known leak", sub: hashNote }));
+    out.append(sectionHead("Keep it that way", "", 120));
+    out.append(actionList([
+      ["Use it in one place only", "Reusing even a strong password lets one breach unlock other accounts."],
+      ["Aim for 14+ characters", "Length beats complexity — a passphrase of random words works well."]
+    ], 160));
+  }
+}
+
+function showLoading() {
+  const l = el("div", "panel loading fade");
+  const t = el("div"); t.append(mode === "email" ? "Scanning breach databases…" : "Hashing locally & checking…", el("small", null, mode === "email" ? "Usually takes a couple of seconds" : "k-anonymity range query"));
+  l.append(el("div", "spin"), t);
+  out.replaceChildren(l);
+}
+
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  const v = mode === "email" ? q.value.trim() : q.value;
+  if (!v) return;
+  go.disabled = true; showLoading();
+  out.scrollIntoView({ behavior: "smooth", block: "start" });
+  try {
+    mode === "email" ? await checkEmail(v) : await checkPassword(v);
+  } catch (err) {
+    out.replaceChildren(summary("err", { icon: ICON.err, title: "Couldn't complete the scan", sub: err.message }));
+  } finally {
+    go.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
